@@ -166,11 +166,16 @@ SIMPLE_JWT = {
 # ---------------------------------------------------------------------------
 FRONTEND_ORIGIN = env("FRONTEND_ORIGIN", default="http://localhost:3000")
 CORS_ALLOWED_ORIGINS = [FRONTEND_ORIGIN]
+# Any Render frontend (*.onrender.com) may call the API, so a manual Render
+# deploy works without pinning FRONTEND_ORIGIN to the exact suffixed URL.
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^https://[a-z0-9-]+\.onrender\.com$"]
 CORS_ALLOW_CREDENTIALS = True
 
-# Origins allowed to embed (iframe) game bundles. Only our own frontend — this
-# is what keeps games playable *only inside the site*.
-GAME_FRAME_ANCESTORS = env.list("GAME_FRAME_ANCESTORS", default=[FRONTEND_ORIGIN])
+# Origins allowed to embed (iframe) game bundles — our own frontend plus any
+# Render frontend, so games stay playable only inside the site.
+GAME_FRAME_ANCESTORS = env.list(
+    "GAME_FRAME_ANCESTORS", default=[FRONTEND_ORIGIN, "https://*.onrender.com"]
+)
 
 # ---------------------------------------------------------------------------
 # i18n
@@ -222,8 +227,11 @@ STORAGES = {
     },
 }
 
-# Behind Render's proxy, honour the forwarded host and CSRF origins.
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[FRONTEND_ORIGIN])
+# Behind Render's proxy, honour the forwarded host and CSRF origins. Any Render
+# subdomain is trusted so the admin/login works on the auto-assigned URL.
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS", default=[FRONTEND_ORIGIN, "https://*.onrender.com"]
+)
 USE_X_FORWARDED_HOST = True
 
 # ---------------------------------------------------------------------------
