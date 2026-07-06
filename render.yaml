@@ -7,19 +7,19 @@
 # Deploy: push to GitHub, then in Render "New +" -> "Blueprint" and pick this repo.
 
 databases:
-  - name: gameplatform-db
+  - name: playhub-db
     plan: free
 
 services:
   # ---- Redis / Key Value (channel layer for realtime) --------------------
   - type: keyvalue
-    name: gameplatform-redis
+    name: playhub-redis
     plan: free
     ipAllowList: []   # only reachable from Render services
 
   # ---- Backend (Django + DRF + Channels, served by Daphne ASGI) ----------
   - type: web
-    name: gameplatform-api
+    name: playhub-api
     runtime: python
     plan: free
     rootDir: backend
@@ -38,19 +38,19 @@ services:
         value: ".onrender.com"
       - key: DATABASE_URL
         fromDatabase:
-          name: gameplatform-db
+          name: playhub-db
           property: connectionString
       - key: REDIS_URL
         fromService:
           type: keyvalue
-          name: gameplatform-redis
+          name: playhub-redis
           property: connectionString
       # Render service URLs are https://<name>.onrender.com. Adjust if you
       # rename the services or attach a custom domain.
       - key: FRONTEND_ORIGIN
-        value: https://gameplatform-web.onrender.com
+        value: https://playhub-web.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://gameplatform-web.onrender.com
+        value: https://playhub-web.onrender.com
       - key: STRIPE_SECRET_KEY
         sync: false        # set in dashboard when going live
       - key: STRIPE_WEBHOOK_SECRET
@@ -58,7 +58,7 @@ services:
 
   # ---- Frontend (Next.js) ------------------------------------------------
   - type: web
-    name: gameplatform-web
+    name: playhub-web
     runtime: node
     plan: free
     rootDir: frontend
@@ -66,4 +66,4 @@ services:
     startCommand: npm run start -- -p $PORT
     envVars:
       - key: NEXT_PUBLIC_API_BASE
-        value: https://gameplatform-api.onrender.com
+        value: https://playhub-api.onrender.com
