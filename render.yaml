@@ -1,0 +1,69 @@
+# Render blueprint — deploys the whole stack:
+#   Postgres + Redis (Key Value) + Django/Channels ASGI backend + Next.js frontend.
+# Redis makes realtime (DM / open chat / voice signalling) horizontally scalable
+# and low-latency in production (the channel layer switches to Redis when
+# REDIS_URL is set).
+#
+# Deploy: push to GitHub, then in Render "New +" -> "Blueprint" and pick this repo.
+
+databases:
+  - name: gameplatform-db
+    plan: free
+
+services:
+  # ---- Redis / Key Value (channel layer for realtime) --------------------
+  - type: keyvalue
+    name: gameplatform-redis
+    plan: free
+    ipAllowList: []   # only reachable from Render services
+
+  # ---- Backend (Django + DRF + Channels, served by Daphne ASGI) ----------
+  - type: web
+    name: gameplatform-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: >
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate
+    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    healthCheckPath: /api/health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gameplatform-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: gameplatform-redis
+          property: connectionString
+      # Render service URLs are https://<name>.onrender.com. Adjust if you
+      # rename the services or attach a custom domain.
+      - key: FRONTEND_ORIGIN
+        value: https://gameplatform-web.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://gameplatform-web.onrender.com
+      - key: STRIPE_SECRET_KEY
+        sync: false        # set in dashboard when going live
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+
+  # ---- Frontend (Next.js) ------------------------------------------------
+  - type: web
+    name: gameplatform-web
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- -p $PORT
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://gameplatform-api.onrender.com

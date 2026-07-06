@@ -1,0 +1,56 @@
+# Production-ish local stack. Dev without Docker also works (SQLite + in-memory
+# channel layer) — see README. This compose file is here for when you move to
+# Postgres + Redis + the ASGI server.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gameplatform
+      POSTGRES_USER: gameplatform
+      POSTGRES_PASSWORD: change-me-in-prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gameplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    command: >
+      sh -c "python manage.py migrate &&
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: change-me-in-prod
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      DATABASE_URL: postgres://gameplatform:change-me-in-prod@db:5432/gameplatform
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_ORIGIN: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
