@@ -15,7 +15,20 @@ def health(_request):
     return JsonResponse({"status": "ok", "service": "game-platform-api"})
 
 
+def root(_request):
+    # This service is the API backend, not the web UI. The website is the
+    # separate Next.js frontend service.
+    return JsonResponse({
+        "service": "Playhub API",
+        "status": "ok",
+        "note": "This is the backend API. Open the frontend web service for the app.",
+        "health": "/api/health",
+        "admin": "/admin/",
+    })
+
+
 urlpatterns = [
+    path("", root, name="root"),
     path("admin/", admin.site.urls),
     path("api/health", health, name="health"),
     path("api/", include("accounts.urls")),
