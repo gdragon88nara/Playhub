@@ -1,7 +1,13 @@
 // Thin API client for the Django backend with JWT handling + auto refresh.
 
+// API origin. Empty string = same-origin (single-service deploy: the API is
+// served under the same host as the app, so calls are relative). A bare host
+// (no scheme) is upgraded to https. Undefined falls back to the local dev API.
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+  RAW_API_BASE && !/^https?:\/\//.test(RAW_API_BASE)
+    ? `https://${RAW_API_BASE}`
+    : RAW_API_BASE;
 
 const ACCESS_KEY = "gp_access";
 const REFRESH_KEY = "gp_refresh";
@@ -667,8 +673,11 @@ export const chatApi = {
 };
 
 // Build a WebSocket URL against the API host, carrying the access token.
+// Same-origin deploys have an empty API_BASE → derive from the current page.
 export function wsUrl(path: string): string {
-  const httpBase = API_BASE.replace(/\/$/, "");
+  let base = API_BASE;
+  if (!base && typeof window !== "undefined") base = window.location.origin;
+  const httpBase = base.replace(/\/$/, "");
   const wsBase = httpBase.replace(/^http/, "ws");
   const token = tokens.access ?? "";
   const sep = path.includes("?") ? "&" : "?";

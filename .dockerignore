@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/.turbo
+backend/.venv
+backend/db.sqlite3
+backend/media
+backend/protected
+backend/staticfiles
+**/__pycache__
+**/*.pyc
+.git
+.github
+**/*.log
+frontend/.env.local

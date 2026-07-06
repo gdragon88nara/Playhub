@@ -1,33 +1,21 @@
-# Render blueprint — deploys the whole stack:
-#   Postgres + Redis (Key Value) + Django/Channels ASGI backend + Next.js frontend.
-# Redis makes realtime (DM / open chat / voice signalling) horizontally scalable
-# and low-latency in production (the channel layer switches to Redis when
-# REDIS_URL is set).
+# Render blueprint — ONE web service running the whole app (Next.js UI +
+# Django/Channels API + WebSockets) behind nginx, on a single URL, plus a
+# managed Postgres. Deploy in one step:
+#   Render -> New + -> Blueprint -> pick this repo -> Apply
 #
-# Deploy: push to GitHub, then in Render "New +" -> "Blueprint" and pick this repo.
+# No frontend/backend URL wiring, no CORS setup: the UI and API share one origin.
 
 databases:
   - name: playhub-db
     plan: free
 
 services:
-  # ---- Redis / Key Value (channel layer for realtime) --------------------
-  - type: keyvalue
-    name: playhub-redis
-    plan: free
-    ipAllowList: []   # only reachable from Render services
-
-  # ---- Backend (Django + DRF + Channels, served by Daphne ASGI) ----------
   - type: web
-    name: playhub-api
-    runtime: python
+    name: playhub
+    runtime: docker
     plan: free
-    rootDir: backend
-    buildCommand: >
-      pip install -r requirements.txt &&
-      python manage.py collectstatic --noinput &&
-      python manage.py migrate
-    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
       - key: SECRET_KEY
@@ -40,30 +28,9 @@ services:
         fromDatabase:
           name: playhub-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: playhub-redis
-          property: connectionString
-      # Render service URLs are https://<name>.onrender.com. Adjust if you
-      # rename the services or attach a custom domain.
-      - key: FRONTEND_ORIGIN
-        value: https://playhub-web.onrender.com
-      - key: CSRF_TRUSTED_ORIGINS
-        value: https://playhub-web.onrender.com
+      # Realtime uses the in-process channel layer (single instance) — no Redis
+      # needed. Payments run in simulation mode until Stripe keys are set here.
       - key: STRIPE_SECRET_KEY
-        sync: false        # set in dashboard when going live
+        sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-
-  # ---- Frontend (Next.js) ------------------------------------------------
-  - type: web
-    name: playhub-web
-    runtime: node
-    plan: free
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    startCommand: npm run start -- -p $PORT
-    envVars:
-      - key: NEXT_PUBLIC_API_BASE
-        value: https://playhub-api.onrender.com
