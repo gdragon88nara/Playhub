@@ -1,0 +1,5 @@
+# Container/deploy scripts must stay LF so bash/nginx work in the Linux image.
+*.sh text eol=lf
+deploy/** text eol=lf
+Dockerfile text eol=lf
+*.template text eol=lf
